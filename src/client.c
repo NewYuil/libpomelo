@@ -11,6 +11,7 @@
 #include "pomelo-private/internal.h"
 #include "pomelo-private/common.h"
 #include "pomelo-private/ngx-queue.h"
+#include "log.h"
 
 static void pc__client_init(pc_client_t *client);
 static void pc__close_async_cb(uv_async_t *handle, int status);
@@ -21,7 +22,7 @@ pc_client_t *pc_client_new() {
   pc_client_t *client = (pc_client_t *)malloc(sizeof(pc_client_t));
 
   if(!client) {
-    fprintf(stderr, "Fail to malloc for pc_client_t.\n");
+    LOGD( "Fail to malloc for pc_client_t.\n");
     abort();
   }
 
@@ -29,7 +30,7 @@ pc_client_t *pc_client_new() {
 
   client->uv_loop = uv_loop_new();
   if(client->uv_loop == NULL) {
-    fprintf(stderr, "Fail to create uv_loop_t.\n");
+    LOGD( "Fail to create uv_loop_t.\n");
     abort();
   }
 
@@ -41,29 +42,29 @@ pc_client_t *pc_client_new() {
 void pc__client_init(pc_client_t *client) {
   client->listeners = pc_map_new(256, pc__release_listeners);
   if(client->listeners == NULL) {
-    fprintf(stderr, "Fail to init client->listeners.\n");
+    LOGD( "Fail to init client->listeners.\n");
     abort();
   }
 
   client->requests = pc_map_new(256, pc__release_requests);
   if(client->requests == NULL) {
-    fprintf(stderr, "Fail to init client->requests.\n");
+    LOGD( "Fail to init client->requests.\n");
     abort();
   }
 
   client->pkg_parser = pc_pkg_parser_new(pc__pkg_cb, client);
   if(client->pkg_parser == NULL) {
-    fprintf(stderr, "Fail to init client->pkg_parser.\n");
+    LOGD( "Fail to init client->pkg_parser.\n");
     abort();
   }
 
   client->heartbeat_timer = (uv_timer_t *)malloc(sizeof(uv_timer_t));
   if(client->heartbeat_timer == NULL) {
-    fprintf(stderr, "Fail to malloc client->heartbeat_timer.\n");
+    LOGD( "Fail to malloc client->heartbeat_timer.\n");
     abort();
   }
   if(uv_timer_init(client->uv_loop, client->heartbeat_timer)) {
-    fprintf(stderr, "Fail to init client->heartbeat_timer.\n");
+    LOGD( "Fail to init client->heartbeat_timer.\n");
     abort();
   }
   client->heartbeat_timer->timer_cb = pc__heartbeat_cb;
@@ -72,11 +73,11 @@ void pc__client_init(pc_client_t *client) {
 
   client->timeout_timer = (uv_timer_t *)malloc(sizeof(uv_timer_t));
   if(client->timeout_timer == NULL) {
-    fprintf(stderr, "Fail to malloc client->timeout_timer.\n");
+    LOGD( "Fail to malloc client->timeout_timer.\n");
     abort();
   }
   if(uv_timer_init(client->uv_loop, client->timeout_timer)) {
-    fprintf(stderr, "Fail to init client->timeout_timer.\n");
+    LOGD( "Fail to init client->timeout_timer.\n");
     abort();
   }
   client->timeout_timer->timer_cb = pc__timeout_cb;
@@ -178,39 +179,39 @@ void pc_client_stop(pc_client_t *client) {
 void pc_client_destroy(pc_client_t *client) {
   if(PC_ST_INITED == client->state) {
     pc__client_clear(client);
-    free(client);
-    return;
+    goto finally;
   }
 
   if(PC_ST_CLOSED == client->state) {
     pc__client_clear(client);
-    free(client);
-    return;
+    goto finally;
   }
 
   // 1. asyn worker thread
-  // 2. wait cond until signal or timeout
+  // 2. wait work thread exit
   // 3. free client
   uv_async_send(client->close_async);
 
-  pc__cond_wait(client, 3);
+  pc_client_join(client);
 
   if(PC_ST_CLOSED != client->state) {
     pc_client_stop(client);
-    pc__client_clear(client);
     // wait uv_loop_t stop
     sleep(1);
-    if(client->uv_loop) {
-      free(client->uv_loop);
-      client->uv_loop = NULL;
-    }
+    pc__client_clear(client);
+  }
+
+finally:
+  if(client->uv_loop) {
+    uv_loop_delete(client->uv_loop);
+    client->uv_loop = NULL;
   }
   free(client);
 }
 
 int pc_client_join(pc_client_t *client) {
   if(PC_ST_WORKING != client->state) {
-    fprintf(stderr, "Fail to join client for invalid state: %d.\n",
+    LOGD( "Fail to join client for invalid state: %d.\n",
             client->state);
     return -1;
   }
@@ -221,12 +222,12 @@ int pc_client_connect(pc_client_t *client, struct sockaddr_in *addr) {
   pc_connect_t *conn_req = pc_connect_req_new(addr);
 
   if(conn_req == NULL) {
-    fprintf(stderr, "Fail to malloc pc_connect_t.\n");
+    LOGD( "Fail to malloc pc_connect_t.\n");
     goto error;
   }
 
   if(pc_connect(client, conn_req, NULL, pc__client_connected_cb)) {
-    fprintf(stderr, "Fail to connect to server.\n");
+    LOGD( "Fail to connect to server.\n");
     goto error;
   }
 
@@ -253,13 +254,13 @@ error:
 int pc_add_listener(pc_client_t *client, const char *event,
                     pc_event_cb event_cb) {
   if(PC_ST_CLOSED == client->state) {
-    fprintf(stderr, "Pomelo client has closed.\n");
+    LOGD( "Pomelo client has closed.\n");
     return -1;
   }
 
   pc_listener_t *listener = pc_listener_new();
   if(listener == NULL) {
-    fprintf(stderr, "Fail to create listener.\n");
+    LOGD( "Fail to create listener.\n");
     return -1;
   }
   listener->cb = event_cb;
@@ -270,7 +271,7 @@ int pc_add_listener(pc_client_t *client, const char *event,
   if(head == NULL) {
     head = (ngx_queue_t *)malloc(sizeof(ngx_queue_t));
     if(head == NULL) {
-      fprintf(stderr, "Fail to create listener queue.\n");
+      LOGD( "Fail to create listener queue.\n");
       pc_listener_destroy(listener);
       return -1;
     }
@@ -331,7 +332,7 @@ void pc_emit_event(pc_client_t *client, const char *event, void *data) {
 
 int pc_run(pc_client_t *client) {
   if(!client || !client->uv_loop) {
-    fprintf(stderr, "Invalid client to run.\n");
+    LOGD( "Invalid client to run.\n");
     return -1;
   }
   return uv_run(client->uv_loop, UV_RUN_DEFAULT);

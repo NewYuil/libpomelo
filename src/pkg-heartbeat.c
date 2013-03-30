@@ -1,5 +1,6 @@
 #include "pomelo.h"
 #include "pomelo-protocol/package.h"
+#include "log.h"
 
 /**
  * Pomelo package heartbeat parsing and processing.
@@ -23,12 +24,12 @@ int pc__heartbeat_req(pc_client_t *client) {
 
   pc_buf_t buf = pc_pkg_encode(PC_PKG_HEARBEAT, NULL, 0);
   if(buf.len == -1) {
-    fprintf(stderr, "Fail to encode heartbeat package.\n");
+    LOGD( "Fail to encode heartbeat package.\n");
     goto error;
   }
 
   if(pc__binary_write(client, buf.base, buf.len, pc__heartbeat_req_cb)) {
-    fprintf(stderr, "Fail to send heartbeat request.\n");
+    LOGD( "Fail to send heartbeat request.\n");
     goto error;
   }
 
@@ -43,7 +44,7 @@ void pc__heartbeat_cb(uv_timer_t* heartbeat_timer, int status) {
   uv_timer_stop(heartbeat_timer);
   pc_client_t *client = (pc_client_t *)heartbeat_timer->data;
   if(status == -1) {
-    fprintf(stderr, "Pomelo heartbeat timer error, %s\n",
+    LOGD( "Pomelo heartbeat timer error, %s\n",
             uv_err_name(uv_last_error(heartbeat_timer->loop)));
     pc_client_stop(client);
     return;
@@ -61,10 +62,10 @@ void pc__timeout_cb(uv_timer_t* timeout_timer, int status) {
   uv_timer_stop(timeout_timer);
   pc_client_t *client = (pc_client_t *)timeout_timer->data;
   if(status == -1) {
-    fprintf(stderr, "Pomelo timeout timer error, %s\n",
+    LOGD( "Pomelo timeout timer error, %s\n",
             uv_err_name(uv_last_error(timeout_timer->loop)));
   } else {
-    fprintf(stderr, "Pomelo client heartbeat timeout.\n");
+    LOGD( "Pomelo client heartbeat timeout.\n");
   }
   pc_client_stop(client);
 }
@@ -79,7 +80,7 @@ static void pc__heartbeat_req_cb(uv_write_t* req, int status) {
   free(req);
 
   if(status == -1) {
-    fprintf(stderr, "Fail to write heartbeat async, %s.\n",
+    LOGD( "Fail to write heartbeat async, %s.\n",
             uv_err_name(uv_last_error(client->uv_loop)));
     pc_client_stop(client);
   }

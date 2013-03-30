@@ -8,6 +8,7 @@
 #include "pomelo-protocol/message.h"
 #include "pomelo-private/common.h"
 #include "pomelo-private/transport.h"
+#include "log.h"
 
 int pc__handshake_req(pc_client_t *client);
 
@@ -30,13 +31,13 @@ static uint32_t pc__req_id = 0;
  */
 pc_connect_t *pc_connect_req_new(struct sockaddr_in *address) {
   if(address == NULL) {
-    fprintf(stderr, "Invalid address argument for pc_connect_req_init.\n");
+    LOGD( "Invalid address argument for pc_connect_req_init.\n");
     return NULL;
   }
 
   pc_connect_t *req = (pc_connect_t *)malloc(sizeof(pc_connect_t));
   if(req == NULL) {
-    fprintf(stderr, "Fail to malloc for pc_connect_t.\n");
+    LOGD( "Fail to malloc for pc_connect_t.\n");
     return NULL;
   }
 
@@ -47,7 +48,7 @@ pc_connect_t *pc_connect_req_new(struct sockaddr_in *address) {
       (struct sockaddr_in *)malloc(sizeof (struct sockaddr_in));
 
   if(cpy_addr == NULL) {
-    fprintf(stderr, "Fail to malloc sockaddr_in in pc_connect_req_init.\n");
+    LOGD( "Fail to malloc sockaddr_in in pc_connect_req_init.\n");
     goto error;
   }
 
@@ -67,6 +68,7 @@ void pc_connect_req_destroy(pc_connect_t *req) {
     free(req->address);
     req->address = NULL;
   }
+  free(req);
 }
 
 /**
@@ -75,12 +77,12 @@ void pc_connect_req_destroy(pc_connect_t *req) {
 int pc_connect(pc_client_t *client, pc_connect_t *req,
                json_t *handshake_opts, pc_connect_cb cb) {
   if(client->state != PC_ST_INITED) {
-    fprintf(stderr, "Invalid Pomelo client state: %d.\n", client->state);
+    LOGD( "Invalid Pomelo client state: %d.\n", client->state);
     return -1;
   }
 
   if(!req || !req->address) {
-    fprintf(stderr, "Invalid connect request.\n");
+    LOGD( "Invalid connect request.\n");
     return -1;
   }
 
@@ -92,14 +94,14 @@ int pc_connect(pc_client_t *client, pc_connect_t *req,
 
   connect_req = (uv_connect_t *)malloc(sizeof(uv_connect_t));
   if(connect_req == NULL) {
-    fprintf(stderr, "Fail to malloc for uv_connect_t.\n");
+    LOGD( "Fail to malloc for uv_connect_t.\n");
     return -1;
   }
 
   data = (void **)malloc(sizeof(void *) * 2);
 
   if(data == NULL) {
-    fprintf(stderr, "Fail to malloc for data array in pc_connect.\n");
+    LOGD( "Fail to malloc for data array in pc_connect.\n");
     goto error;
   }
 
@@ -122,13 +124,14 @@ int pc_connect(pc_client_t *client, pc_connect_t *req,
 
   if(uv_tcp_connect(connect_req, transport->socket,
                     *req->address, pc__on_tcp_connect)) {
-    fprintf(stderr, "Fail to connect to server.");
+    LOGD( "Fail to connect to server.");
     goto error;
   }
 
   return 0;
 
 error:
+  req->data = NULL;
   if(data) free(data);
   if(transport) pc_transport_destroy(transport);
   if(connect_req) free(connect_req);
@@ -139,7 +142,7 @@ error:
 pc_request_t *pc_request_new() {
   pc_request_t *req = (pc_request_t *)malloc(sizeof(pc_request_t));
   if(req == NULL) {
-    fprintf(stderr, "Fail to malloc for new pc_request_t.\n");
+    LOGD( "Fail to malloc for new pc_request_t.\n");
     return NULL;
   }
 
@@ -160,7 +163,7 @@ void pc_request_destroy(pc_request_t *req) {
 int pc_request(pc_client_t *client, pc_request_t *req, const char *route,
                json_t *msg, pc_request_cb cb) {
   if(PC_ST_WORKING != client->state) {
-    fprintf(stderr, "Invalid client state to send request: %d\n", client->state);
+    LOGD( "Invalid client state to send request: %d\n", client->state);
     return -1;
   }
   req->cb = cb;
@@ -174,7 +177,7 @@ int pc_request(pc_client_t *client, pc_request_t *req, const char *route,
 pc_notify_t *pc_notify_new() {
   pc_notify_t *req = (pc_notify_t *)malloc(sizeof(pc_notify_t));
   if(req == NULL) {
-    fprintf(stderr, "Fail to malloc new pc_notify_t.\n");
+    LOGD( "Fail to malloc new pc_notify_t.\n");
     return NULL;
   }
   memset(req, 0, sizeof(pc_notify_t));
@@ -197,7 +200,7 @@ void pc_notify_destroy(pc_notify_t *req) {
 int pc_notify(pc_client_t *client, pc_notify_t *req, const char *route,
               json_t *msg, pc_notify_cb cb) {
   if(PC_ST_WORKING != client->state) {
-    fprintf(stderr, "Invalid client state to send notify: %d\n", client->state);
+    LOGD( "Invalid client state to send notify: %d\n", client->state);
     return -1;
   }
 
@@ -215,7 +218,7 @@ static void pc__request(pc_request_t *req, int status) {
 
   // check transport state again
   if(PC_TP_ST_WORKING != transport->state) {
-    fprintf(stderr, "Fail to request for transport not working.\n");
+    LOGD( "Fail to request for transport not working.\n");
     req->cb(req, status, NULL);
     return;
   }
@@ -231,14 +234,14 @@ static void pc__request(pc_request_t *req, int status) {
   msg_buf = client->encode_msg(client, req->id, req->route, req->msg);
 
   if(msg_buf.len == -1) {
-    fprintf(stderr, "Fail to encode request message.\n");
+    LOGD( "Fail to encode request message.\n");
     goto error;
   }
 
   pkg_buf = pc_pkg_encode(PC_PKG_DATA, msg_buf.base, msg_buf.len);
 
   if(msg_buf.len == -1) {
-    fprintf(stderr, "Fail to encode request package.\n");
+    LOGD( "Fail to encode request package.\n");
     goto error;
   }
 
@@ -253,7 +256,7 @@ static void pc__request(pc_request_t *req, int status) {
   // record request context
   data = (void **)malloc(sizeof(void *) * 2);
   if(data == NULL) {
-    fprintf(stderr, "Fail to malloc void** for pc__request.\n");
+    LOGD( "Fail to malloc void** for pc__request.\n");
     goto error;
   }
 
@@ -265,7 +268,7 @@ static void pc__request(pc_request_t *req, int status) {
                      (uv_buf_t *)&pkg_buf, 1, pc__on_request);
 
   if(res == -1) {
-    fprintf(stderr, "Send message error %s\n",
+    LOGD( "Send message error %s\n",
             uv_err_name(uv_last_error(write_req->handle->loop)));
     goto error;
   }
@@ -300,7 +303,7 @@ static void pc__notify(pc_notify_t *req, int status) {
 
   // check client state again
   if(PC_TP_ST_WORKING != transport->state) {
-    fprintf(stderr, "Fail to notify for transport not working.\n");
+    LOGD( "Fail to notify for transport not working.\n");
     req->cb(req, status);
     return;
   }
@@ -317,14 +320,14 @@ static void pc__notify(pc_notify_t *req, int status) {
   msg_buf = client->encode_msg(client, 0, req->route, req->msg);
 
   if(msg_buf.len == -1) {
-    fprintf(stderr, "Fail to encode request message.\n");
+    LOGD( "Fail to encode request message.\n");
     goto error;
   }
 
   pkg_buf = pc_pkg_encode(PC_PKG_DATA, msg_buf.base, msg_buf.len);
 
   if(msg_buf.len == -1) {
-    fprintf(stderr, "Fail to encode request package.\n");
+    LOGD( "Fail to encode request package.\n");
     goto error;
   }
 
@@ -339,7 +342,7 @@ static void pc__notify(pc_notify_t *req, int status) {
   // record notify context
   data = (void **)malloc(sizeof(void *) * 2);
   if(data == NULL) {
-    fprintf(stderr, "Fail to malloc void** for pc__request.\n");
+    LOGD( "Fail to malloc void** for pc__request.\n");
     goto error;
   }
 
@@ -351,7 +354,7 @@ static void pc__notify(pc_notify_t *req, int status) {
                      (uv_buf_t *)&pkg_buf, 1, pc__on_notify);
 
   if(res == -1) {
-    fprintf(stderr, "Send message error %s\n",
+    LOGD( "Send message error %s\n",
             uv_err_name(uv_last_error(write_req->handle->loop)));
     goto error;
   }
@@ -388,7 +391,7 @@ static void pc__on_tcp_connect(uv_connect_t *req, int status) {
   free(data);
 
   if(PC_ST_CONNECTING != client->state) {
-    fprintf(stderr, "Invalid client state when tcp connected: %d.\n",
+    LOGD( "Invalid client state when tcp connected: %d.\n",
             client->state);
     client->conn_req = NULL;
     conn_req->cb(conn_req, -1);
@@ -396,7 +399,7 @@ static void pc__on_tcp_connect(uv_connect_t *req, int status) {
   }
 
   if(status == -1) {
-    fprintf(stderr, "Connect failed error %s\n",
+    LOGD( "Connect failed error %s\n",
             uv_err_name(uv_last_error(req->handle->loop)));
     goto error;
   }
@@ -406,7 +409,7 @@ static void pc__on_tcp_connect(uv_connect_t *req, int status) {
   // start the tcp reading until disconnect
   if(uv_read_start((uv_stream_t*)transport->socket, pc__alloc_buffer,
                    pc_tp_on_tcp_read)) {
-    fprintf(stderr, "Fail to start reading server %s\n",
+    LOGD( "Fail to start reading server %s\n",
             uv_err_name(uv_last_error(client->uv_loop)));
     goto error;
   }
@@ -430,13 +433,13 @@ error:
 static int pc__async_write(pc_transport_t *transport, pc_tcp_req_t *req,
                            const char *route, json_t *msg) {
   if(PC_TP_ST_WORKING != transport->state) {
-    fprintf(stderr, "Fail to asyn write for transport not working: %d.\n",
+    LOGD( "Fail to asyn write for transport not working: %d.\n",
             transport->state);
     return -1;
   }
 
   if(!req || !route /*|| !msg*/) {
-    fprintf(stderr, "Invalid tcp request.\n");
+    LOGD( "Invalid tcp request.\n");
     return -1;
   }
 
@@ -448,7 +451,7 @@ static int pc__async_write(pc_transport_t *transport, pc_tcp_req_t *req,
 
   cpy_route = malloc(route_len);
   if(cpy_route == NULL) {
-    fprintf(stderr, "Fail to malloc for route string in pc__async_write.\n");
+    LOGD( "Fail to malloc for route string in pc__async_write.\n");
     goto error;
   }
   memcpy((void *)cpy_route, route, route_len);
@@ -461,12 +464,12 @@ static int pc__async_write(pc_transport_t *transport, pc_tcp_req_t *req,
 
   async_req = (uv_async_t *)malloc(sizeof(uv_async_t));
   if(async_req == NULL) {
-    fprintf(stderr, "Fail to malloc for async notify.\n");
+    LOGD( "Fail to malloc for async notify.\n");
     goto error;
   }
 
   if(uv_async_init(client->uv_loop, async_req, pc__async_write_cb)) {
-    fprintf(stderr, "Fail to init async write tcp request, type: %d.\n",
+    LOGD( "Fail to init async write tcp request, type: %d.\n",
             req->type);
     goto error;
   }
@@ -475,7 +478,7 @@ static int pc__async_write(pc_transport_t *transport, pc_tcp_req_t *req,
 
   async_req->data = (void *)req;
   if(uv_async_send(async_req)) {
-    fprintf(stderr, "Fail to send async write tcp request, type: %d.\n",
+    LOGD( "Fail to send async write tcp request, type: %d.\n",
             req->type);
     goto error;
   }
@@ -504,7 +507,7 @@ static void pc__async_write_cb(uv_async_t* req, int status) {
   } else if(tcp_req->type == PC_REQUEST) {
     pc__request((pc_request_t *)tcp_req, status);
   } else {
-    fprintf(stderr, "Unknown tcp request type: %d\n", tcp_req->type);
+    LOGD( "Unknown tcp request type: %d\n", tcp_req->type);
     // TDOO: should abort? How to free unknown tcp request
     free(tcp_req);
     return;
@@ -526,13 +529,13 @@ static void pc__on_request(uv_write_t *req, int status) {
   free(data);
 
   if(PC_TP_ST_WORKING != transport->state) {
-    fprintf(stderr, "Request error for transport not working.\n");
+    LOGD( "Request error for transport not working.\n");
     request_req->cb(request_req, -1, NULL);
     return;
   }
 
   if(status == -1) {
-    fprintf(stderr, "Request error %s\n",
+    LOGD( "Request error %s\n",
             uv_err_name(uv_last_error(req->handle->loop)));
     char req_id_str[64];
     memset(req_id_str, 0, 64);
@@ -561,13 +564,13 @@ static void pc__on_notify(uv_write_t *req, int status) {
   free(data);
 
   if(PC_TP_ST_WORKING != transport->state) {
-    fprintf(stderr, "Notify error for transport not working.\n");
+    LOGD( "Notify error for transport not working.\n");
     notify_req->cb(notify_req, -1);
     return;
   }
 
   if(status == -1) {
-    fprintf(stderr, "Notify error %s\n",
+    LOGD( "Notify error %s\n",
             uv_err_name(uv_last_error(req->handle->loop)));
   }
 
@@ -577,7 +580,7 @@ static void pc__on_notify(uv_write_t *req, int status) {
 int pc__binary_write(pc_client_t *client, const char *data, size_t len,
                             uv_write_cb cb) {
   if(PC_ST_CONNECTED != client->state && PC_ST_WORKING != client->state) {
-    fprintf(stderr, "Fail to write binary for invalid client state: %d.\n",
+    LOGD( "Fail to write binary for invalid client state: %d.\n",
             client->state);
     return -1;
   }
@@ -587,7 +590,7 @@ int pc__binary_write(pc_client_t *client, const char *data, size_t len,
 
   req = (uv_write_t *)malloc(sizeof(uv_write_t));
   if(req == NULL) {
-    fprintf(stderr, "Fail to malloc for uv_write_t.\n");
+    LOGD( "Fail to malloc for uv_write_t.\n");
     goto error;
   }
 
@@ -595,7 +598,7 @@ int pc__binary_write(pc_client_t *client, const char *data, size_t len,
 
   attach = (void **)malloc(sizeof(void *) * 2);
   if(data == NULL) {
-    fprintf(stderr, "Fail to malloc data for handshake ack.\n");
+    LOGD( "Fail to malloc data for handshake ack.\n");
     goto error;
   }
 
@@ -609,7 +612,7 @@ int pc__binary_write(pc_client_t *client, const char *data, size_t len,
   };
 
   if(uv_write(req, (uv_stream_t *)client->transport->socket, &buf, 1, cb)) {
-    fprintf(stderr, "Fail to write handshake ack pakcage, %s\n",
+    LOGD( "Fail to write handshake ack pakcage, %s\n",
             uv_err_name(uv_last_error(req->handle->loop)));
     goto error;
   }

@@ -11,7 +11,11 @@ void on_request_cb(pc_request_t *req, int status, json_t *resp) {
   if(status == -1) {
     printf("Fail to send request to server.\n");
   } else if(status == 0) {
-    printf("server response: %s\n", json_dumps(resp, 0));
+    char *json_str = json_dumps(resp, 0);
+    if(json_str != NULL) {
+      printf("server response: %s\n", json_str);
+      free(json_str);
+    }
   }
 
   // release relative resource with pc_request_t
@@ -24,7 +28,10 @@ void do_request(pc_client_t *client) {
   // compose request
   const char *route = "connector.helloHandler.hi";
   json_t *msg = json_object();
-  json_object_set(msg, "msg", json_string("hi~"));
+  json_t *str = json_string("hi~");
+  json_object_set(msg, "msg", str);
+  // decref for json object
+  json_decref(str);
 
   pc_request_t *request = pc_request_new();
   pc_request(client, request, route, msg, on_request_cb);
@@ -60,6 +67,7 @@ int main() {
   do_request(client);
 
   // main thread sleep 3 second and then destroy the client instance.
+  printf("Main thread sleep 3 second and then destroy the client instance.\n");
   sleep(3);
 
   // release the client

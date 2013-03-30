@@ -1,6 +1,8 @@
+#include <string.h>
 #include "pomelo.h"
 #include "pomelo-private/internal.h"
 #include "pomelo-protocol/message.h"
+#include "log.h"
 
 /**
  * Default implementation of Pomelo protocol encode and decode.
@@ -13,7 +15,7 @@ static void pc__process_response(pc_client_t *client, pc_msg_t *msg) {
 
   pc_request_t *req = (pc_request_t *)pc_map_get(client->requests, req_id_str);
   if(req == NULL) {
-    fprintf(stderr, "Fail to get pc_request_t for request id: %u.\n", msg->id);
+    LOGD( "Fail to get pc_request_t for request id: %u.\n", msg->id);
     return;
   }
 
@@ -67,7 +69,7 @@ void pc__pkg_cb(pc_pkg_type type, const char *data, size_t len, void *attach) {
       pc_emit_event(client, PC_EVENT_KICK, NULL);
     break;
     default:
-      fprintf(stderr, "Unknown Pomelo package type: %d.\n", type);
+      LOGD( "Unknown Pomelo package type: %d.\n", type);
       status = -1;
     break;
   }
@@ -97,7 +99,7 @@ pc_msg_t *pc__default_msg_parse_cb(pc_client_t *client, const char *data,
 
   msg = (pc_msg_t *)malloc(sizeof(pc_msg_t));
   if(msg == NULL) {
-    fprintf(stderr, "Fail to malloc for pc_msg_t while parsing raw message.\n");
+    LOGD( "Fail to malloc for pc_msg_t while parsing raw message.\n");
     goto error;
   }
   memset(msg, 0, sizeof(pc_msg_t));
@@ -111,7 +113,7 @@ pc_msg_t *pc__default_msg_parse_cb(pc_client_t *client, const char *data,
     if(raw_msg->compressRoute) {
       origin_route = pc__resolve_dictionary(client, raw_msg->route.route_code);
       if(origin_route == NULL) {
-        fprintf(stderr, "Fail to uncompress route dictionary: %d.\n",
+        LOGD( "Fail to uncompress route dictionary: %d.\n",
                 raw_msg->route.route_code);
         goto error;
       }
@@ -121,7 +123,7 @@ pc_msg_t *pc__default_msg_parse_cb(pc_client_t *client, const char *data,
 
     route_str = malloc(strlen(origin_route) + 1);
     if(route_str == NULL) {
-      fprintf(stderr, "Fail to malloc for uncompress route dictionary.\n");
+      LOGD( "Fail to malloc for uncompress route dictionary.\n");
       goto error;
     }
 
@@ -134,7 +136,7 @@ pc_msg_t *pc__default_msg_parse_cb(pc_client_t *client, const char *data,
     sprintf(id_str, "%u", msg->id);
     pc_request_t *req = (pc_request_t *)pc_map_get(client->requests, id_str);
     if(req == NULL) {
-      fprintf(stderr, "Fail to get correlative request for the response: %u\n",
+      LOGD( "Fail to get correlative request for the response: %u\n",
               msg->id);
       goto error;
     }
@@ -156,6 +158,9 @@ pc_msg_t *pc__default_msg_parse_cb(pc_client_t *client, const char *data,
       goto error;
     }
   }
+
+  // release resources nolong used
+  pc__raw_msg_destroy(raw_msg);
 
   return msg;
 
@@ -191,14 +196,14 @@ pc_buf_t pc__default_msg_encode_cb(pc_client_t *client, uint32_t reqId,
   if(pb_def) {
     body_buf = pc__pb_encode(msg, pb_def);
     if(body_buf.len == -1) {
-      fprintf(stderr, "Fail to encode message with protobuf: %s\n", route);
+      LOGD( "Fail to encode message with protobuf: %s\n", route);
       goto error;
     }
   } else {
     // json encode
     body_buf = pc__json_encode(msg);
     if(body_buf.len == -1) {
-      fprintf(stderr, "Fail to encode message with json: %s\n", route);
+      LOGD( "Fail to encode message with json: %s\n", route);
       goto error;
     }
   }
@@ -212,14 +217,14 @@ pc_buf_t pc__default_msg_encode_cb(pc_client_t *client, uint32_t reqId,
   if(route_code > 0) {
     msg_buf = pc_msg_encode_code(reqId, type, route_code, body_buf);
     if(msg_buf.len == -1) {
-      fprintf(stderr, "Fail to encode message with route code: %d\n",
+      LOGD( "Fail to encode message with route code: %d\n",
               route_code);
       goto error;
     }
   } else {
     msg_buf = pc_msg_encode_route(reqId, type, route, body_buf);
     if(msg_buf.len == -1) {
-      fprintf(stderr, "Fail to encode message with route string: %s\n",
+      LOGD( "Fail to encode message with route string: %s\n",
               route);
       goto error;
     }
@@ -243,3 +248,4 @@ void pc__default_msg_encode_done_cb(pc_client_t *client, pc_buf_t buf) {
     free(buf.base);
   }
 }
+

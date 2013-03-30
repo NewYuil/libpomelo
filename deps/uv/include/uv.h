@@ -21,14 +21,18 @@
 
 /* See http://nikhilm.github.com/uvbook/ for an introduction. */
 
+#ifndef __unix__
+  #define __unix__
+#endif
+
+#ifndef __linux__
+ #define __linux__
+#endif
+
 #ifndef UV_H
 #define UV_H
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#ifndef __ANDROID__
-#define __ANDROID__
 #endif
 
 #ifdef _WIN32
@@ -67,7 +71,7 @@ extern "C" {
 #endif
 
 #if defined(__unix__) || defined(__POSIX__) || \
-    defined(__APPLE__) || defined(_AIX) || defined(__ANDROID__)
+    defined(__APPLE__) || defined(_AIX)
 # include "uv-private/uv-unix.h"
 #else
 # include "uv-private/uv-win.h"

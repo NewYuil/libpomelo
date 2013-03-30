@@ -4,6 +4,7 @@
 #include "pomelo-private/internal.h"
 #include "pomelo-private/common.h"
 #include "pomelo-protocol/package.h"
+#include "log.h"
 
 static size_t pc__pkg_head(pc_pkg_parser_t *parser,
                            const char *data, size_t offset, size_t nread);
@@ -13,7 +14,7 @@ static size_t pc__pkg_body(pc_pkg_parser_t *parser,
 pc_pkg_parser_t *pc_pkg_parser_new(pc_pkg_cb cb, void *attach) {
   pc_pkg_parser_t *parser = (pc_pkg_parser_t *)malloc(sizeof(pc_pkg_parser_t));
   if(parser == NULL) {
-    fprintf(stderr, "Fail to malloc for pc_pkg_parser_t.\n");
+    LOGD( "Fail to malloc for pc_pkg_parser_t.\n");
     return NULL;
   }
 
@@ -92,7 +93,7 @@ int pc_pkg_parser_feed(pc_pkg_parser_t *parser, const char *data, size_t nread) 
     }
     if(parser->state != PC_PKG_HEAD && parser->state != PC_PKG_BODY &&
        parser->state != PC_PKG_CLOSED) {
-      fprintf(stderr, "Invalid package parser state: %d\n", parser->state);
+      LOGD( "Invalid package parser state: %d\n", parser->state);
       return -1;
     }
   }
@@ -103,7 +104,7 @@ int pc_pkg_parser_feed(pc_pkg_parser_t *parser, const char *data, size_t nread) 
 pc_buf_t pc_pkg_encode(pc_pkg_type type, const char *data, size_t len) {
   pc_buf_t buf;
   if(len >= PC_PKG_MAX_BODY_BYTES) {
-    fprintf(stderr, "Data is to large for Pomelo package. Body limit: %d.\n",
+    LOGD( "Data is to large for Pomelo package. Body limit: %d.\n",
             PC_PKG_MAX_BODY_BYTES);
     buf.len = -1;
     return buf;
@@ -112,7 +113,7 @@ pc_buf_t pc_pkg_encode(pc_pkg_type type, const char *data, size_t len) {
   size_t size = PC_PKG_HEAD_BYTES + len;
   buf.base = malloc(size);
   if(buf.base == NULL) {
-    fprintf(stderr, "Fail to malloc for Pomelo package, size: %lu.\n", size);
+    LOGD( "Fail to malloc for Pomelo package, size: %lu.\n", size);
     buf.len = -1;
     return buf;
   }
@@ -170,7 +171,7 @@ static size_t pc__pkg_head(pc_pkg_parser_t *parser,
     if(pkg_len > 0) {
       parser->pkg_buf = malloc(pkg_len);
       if(parser->pkg_buf == NULL) {
-        fprintf(stderr, "Fail to malloc buffer for package size: %lu\n", pkg_len);
+        LOGD( "Fail to malloc buffer for package size: %lu\n", pkg_len);
         return -1;
       }
 

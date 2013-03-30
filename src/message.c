@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string.h>
 #include "pomelo-protocol/message.h"
+#include "log.h"
 
 static uint8_t pc__msg_id_length(uint32_t id);
 
@@ -114,10 +115,10 @@ pc__msg_raw_t *pc_msg_decode(const char *data, size_t len) {
 
   msg = (pc__msg_raw_t *)malloc(sizeof(pc__msg_raw_t));
   if(msg == NULL) {
-    fprintf(stderr, "Fail to malloc for pc_msg_t.\n");
+    LOGD( "Fail to malloc for pc_raw_msg_t.\n");
     return NULL;
   }
-  memset(msg, 0, sizeof(pc_msg_t));
+  memset(msg, 0, sizeof(pc__msg_raw_t));
 
   size_t offset = 0;
 
@@ -129,7 +130,7 @@ pc__msg_raw_t *pc_msg_decode(const char *data, size_t len) {
   uint8_t type = (flag >> 1) & 0xff;
 
   if(!PC_MSG_VALIDATE(type)) {
-    fprintf(stderr, "Unknown Pomleo message type: %d.\n", type);
+    LOGD( "Unknown Pomleo message type: %d.\n", type);
     goto error;
   }
 
@@ -168,7 +169,7 @@ pc__msg_raw_t *pc_msg_decode(const char *data, size_t len) {
       if(route_len) {
         route_str = malloc(route_len + 1);
         if(route_str == NULL) {
-          fprintf(stderr, "Fail to malloc for message route string.\n");
+          LOGD( "Fail to malloc for message route string.\n");
           goto error;
         }
 
@@ -252,4 +253,5 @@ void pc__raw_msg_destroy(pc__msg_raw_t *msg) {
   if(msg->body.len > 0) {
     free(msg->body.base);
   }
+  free(msg);
 }

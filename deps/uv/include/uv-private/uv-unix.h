@@ -41,10 +41,6 @@
 #include <pthread.h>
 #include <signal.h>
 
-#if defined(__ANDROID__)
-#include "uv-android.h"
-#endif
-
 struct uv__io_s;
 struct uv_loop_s;
 
@@ -118,7 +114,7 @@ typedef UV_PLATFORM_SEM_T uv_sem_t;
 typedef pthread_cond_t uv_cond_t;
 
 
-#if defined(__APPLE__) && defined(__MACH__)
+//#if defined(__APPLE__) && defined(__MACH__)
 
 typedef struct {
   unsigned int n;
@@ -128,19 +124,11 @@ typedef struct {
   uv_sem_t turnstile2;
 } uv_barrier_t;
 
-＃elif defined(__ANDROID__)
+//#else /* defined(__APPLE__) && defined(__MACH__) */
 
-typedef struct {
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
-  unsigned count;
-} uv_barrier_t;
+//typedef pthread_barrier_t uv_barrier_t;
 
-#else /* defined(__APPLE__) && defined(__MACH__) */
-
-typedef pthread_barrier_t uv_barrier_t;
-
-#endif /* defined(__APPLE__) && defined(__MACH__) */
+//#endif /* defined(__APPLE__) && defined(__MACH__) */
 
 /* Platform-specific definitions for uv_spawn support. */
 typedef gid_t uv_gid_t;

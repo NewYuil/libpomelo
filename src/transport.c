@@ -3,6 +3,7 @@
 #include <string.h>
 #include "pomelo-private/transport.h"
 #include "pomelo-protocol/package.h"
+#include "log.h"
 
 void pc__tcp_close_cb(uv_handle_t *handler) {
   pc_transport_t *transport = (pc_transport_t *)handler->data;
@@ -14,7 +15,7 @@ pc_transport_t *pc_transport_new(pc_client_t *client) {
   pc_transport_t *transport = (pc_transport_t *)malloc(sizeof(pc_transport_t));
 
   if(transport == NULL) {
-    fprintf(stderr, "Fail to malloc for pc_transport_t.\n");
+    LOGD( "Fail to malloc for pc_transport_t.\n");
     goto error;
   }
 
@@ -23,12 +24,12 @@ pc_transport_t *pc_transport_new(pc_client_t *client) {
   transport->client = client;
   transport->socket = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
   if(transport->socket == NULL) {
-    fprintf(stderr, "Fail to malloc for uv_tcp_t.\n");
+    LOGD( "Fail to malloc for uv_tcp_t.\n");
     goto error;
   }
 
   if(uv_tcp_init(client->uv_loop, transport->socket)) {
-    fprintf(stderr, "Fail to uv_tcp_init.\n");
+    LOGD( "Fail to uv_tcp_init.\n");
     goto error;
   }
 
@@ -59,7 +60,7 @@ void pc_transport_destroy(pc_transport_t *transport) {
 
 int pc_transport_start(pc_transport_t *transport) {
   if(PC_TP_ST_INITED != transport->state) {
-    fprintf(stderr, "Fail to start transport for invalid state: %d.\n",
+    LOGD( "Fail to start transport for invalid state: %d.\n",
             transport->state);
     return -1;
   }
@@ -71,7 +72,7 @@ int pc_transport_start(pc_transport_t *transport) {
 
 void pc_client_on_tcp_read(pc_client_t *client, const char *data, size_t len) {
   if(pc_pkg_parser_feed(client->pkg_parser, data, len)) {
-    fprintf(stderr, "Fail to process data from server.\n");
+    LOGD( "Fail to process data from server.\n");
     pc_client_stop(client);
   }
 }
@@ -82,14 +83,14 @@ void pc_client_on_tcp_read(pc_client_t *client, const char *data, size_t len) {
 void pc_tp_on_tcp_read(uv_stream_t *socket, ssize_t nread, uv_buf_t buf) {
   pc_transport_t *transport = (pc_transport_t *)socket->data;
   if(PC_TP_ST_WORKING != transport->state) {
-    fprintf(stderr, "Discard read data for transport has stop work: %d\n",
+    LOGD( "Discard read data for transport has stop work: %d\n",
             transport->state);
     goto error;
   }
 
   if (nread == -1) {
     if (uv_last_error(socket->loop).code != UV_EOF)
-      fprintf(stderr, "Read error %s\n",
+      LOGD( "Read error %s\n",
               uv_err_name(uv_last_error(socket->loop)));
     pc_client_stop(transport->client);
     goto error;

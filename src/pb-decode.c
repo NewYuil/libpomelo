@@ -18,6 +18,7 @@
 #include "pomelo-protobuf/pb-util.h"
 #include <string.h>
 #include <stdlib.h>
+ #include "log.h"
 
 typedef struct _pb_istream_t pb_istream_t;
 
@@ -96,7 +97,7 @@ bool pc_pb_decode(uint8_t *buf, size_t len, json_t *protos,
           json_t *result) {
   pb_istream_t stream = pb_istream_from_buffer(buf, len);
   if(!pb_decode(&stream, protos, result)) {
-    fprintf(stderr, "decode error\n");
+    LOGD( "decode error\n");
     return 0;
   }
   return 1;
@@ -209,7 +210,9 @@ static bool checkreturn pb_decode_proto(pb_istream_t *stream, json_t *proto,
     if (!pb_decode_string(stream, str_value, str_len)) {
       return false;
     }
-    json_object_set(result, key, json_string(str_value));
+    json_t *json_str = json_string(str_value);
+    json_object_set(result, key, json_str);
+    json_decref(json_str);
     free(str_value);
     break;
   default:
@@ -245,13 +248,13 @@ static bool checkreturn pb_decode_array(pb_istream_t *stream, json_t *proto, jso
   type = json_object_get(proto, "type");
   type_text = json_string_value(type);
   if (!result) {
-    fprintf(stderr, "error result is null pb_decode_array\n");
+    LOGD( "error result is null pb_decode_array\n");
     return false;
   }
   array = json_object_get(result, key);
 
 #ifdef PB_DEBUG
-  fprintf(stderr, "%s\n", json_dumps(proto,JSON_ENCODE_ANY));
+  LOGD( "%s\n", json_dumps(proto,JSON_ENCODE_ANY));
 #endif
   if (!array) {
     array = json_array();

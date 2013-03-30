@@ -9,6 +9,7 @@
 #include "pomelo-protobuf/pb.h"
 #include "pomelo-protobuf/pb-util.h"
 #include <string.h>
+ #include "log.h"
 
 /* The warn_unused_result attribute appeared first in gcc-3.4.0 */
 #if !defined(__GNUC__) || ( __GNUC__ < 3) || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
@@ -92,7 +93,7 @@ static bool pb_encode_submessage(pb_ostream_t *stream, json_t *protos, json_t *v
 bool pc_pb_encode(uint8_t *buf, size_t len, size_t *written, json_t *protos, json_t *msg){
   pb_ostream_t stream = pb_ostream_from_buffer(buf, len);
   if(!pb_encode(&stream,protos,msg)){
-    fprintf(stderr, "pb_encode error\n");
+    LOGD( "pb_encode error\n");
     return 0;
   }
   *written = stream.bytes_written;

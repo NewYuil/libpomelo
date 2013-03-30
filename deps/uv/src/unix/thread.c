@@ -266,7 +266,7 @@ int uv_sem_trywait(uv_sem_t* sem) {
 #endif /* defined(__APPLE__) && defined(__MACH__) */
 
 
-#if defined(__APPLE__) && defined(__MACH__) || defined(__ANDROID__)
+#if defined(__APPLE__) && defined(__MACH__)
 
 int uv_cond_init(uv_cond_t* cond) {
   if (pthread_cond_init(cond, NULL))
@@ -275,7 +275,7 @@ int uv_cond_init(uv_cond_t* cond) {
     return 0;
 }
 
-#else /* !(defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__)*/
+#else /* !(defined(__APPLE__) && defined(__MACH__)) */
 
 int uv_cond_init(uv_cond_t* cond) {
   pthread_condattr_t attr;
@@ -283,7 +283,7 @@ int uv_cond_init(uv_cond_t* cond) {
   if (pthread_condattr_init(&attr))
     return -1;
 
-  if (pthread_condattr_setclock(&attr, CLOCK_MONOTONIC))
+  if (pthread_condattr_setpshared(&attr, CLOCK_MONOTONIC))
     goto error2;
 
   if (pthread_cond_init(cond, &attr))
@@ -301,7 +301,7 @@ error2:
   return -1;
 }
 
-#endif /* defined(__APPLE__) && defined(__MACH__) || defined(__ANDROID__)*/
+#endif /* defined(__APPLE__) && defined(__MACH__) */
 
 void uv_cond_destroy(uv_cond_t* cond) {
   if (pthread_cond_destroy(cond))
@@ -323,8 +323,8 @@ void uv_cond_wait(uv_cond_t* cond, uv_mutex_t* mutex) {
     abort();
 }
 
+#if defined(__APPLE__) && defined(__MACH__)
 
-#if defined(__APPLE__) && defined(__MACH__) || defined(__ANDROID__)
 int uv_cond_timedwait(uv_cond_t* cond, uv_mutex_t* mutex, uint64_t timeout) {
   int r;
   struct timeval tv;
@@ -336,7 +336,6 @@ int uv_cond_timedwait(uv_cond_t* cond, uv_mutex_t* mutex, uint64_t timeout) {
   ts.tv_sec = abstime / NANOSEC;
   ts.tv_nsec = abstime % NANOSEC;
   r = pthread_cond_timedwait(cond, mutex, &ts);
-  
 
   if (r == 0)
     return 0;
@@ -373,7 +372,7 @@ int uv_cond_timedwait(uv_cond_t* cond, uv_mutex_t* mutex, uint64_t timeout) {
 #endif /* defined(__APPLE__) && defined(__MACH__) */
 
 
-#if defined(__APPLE__) && defined(__MACH__)
+//#if defined(__APPLE__) && defined(__MACH__)
 
 int uv_barrier_init(uv_barrier_t* barrier, unsigned int count) {
   barrier->n = count;
@@ -428,8 +427,8 @@ void uv_barrier_wait(uv_barrier_t* barrier) {
   uv_sem_post(&barrier->turnstile2);
 }
 
-#else /* !(defined(__APPLE__) && defined(__MACH__)) */
-
+//#else /* !(defined(__APPLE__) && defined(__MACH__)) */
+/*
 int uv_barrier_init(uv_barrier_t* barrier, unsigned int count) {
   if (pthread_barrier_init(barrier, NULL, count))
     return -1;
@@ -449,5 +448,5 @@ void uv_barrier_wait(uv_barrier_t* barrier) {
   if (r && r != PTHREAD_BARRIER_SERIAL_THREAD)
     abort();
 }
-
-#endif /* defined(__APPLE__) && defined(__MACH__) */
+*/
+//#endif /* defined(__APPLE__) && defined(__MACH__) */
